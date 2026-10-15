@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quadratic Lab: AI Math Differentiator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#f3f6f8;--grid:#d9e2ea;--ink:#12263a;--muted:#5a6b7b;--card:#fff;
+  --l1:#0e7c66;--l2:#2f5bea;--l3:#c2410c;--lv:var(--l1)}
+[data-level="2"]{--lv:var(--l2)}[data-level="3"]{--lv:var(--l3)}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font:400 17px/1.55 "Source Sans 3",system-ui,sans-serif;
+  background:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:28px 28px}
+main{max-width:760px;margin:0 auto;padding:40px 20px 64px}
+h1{font:800 clamp(2rem,6vw,3rem)/1.05 "Bricolage Grotesque",sans-serif;margin:0 0 8px;letter-spacing:-.02em}
+.sub{margin:0 0 28px;color:var(--muted);max-width:52ch}
+.levels{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.lvl{font:inherit;text-align:left;background:var(--card);border:2px solid var(--ink);border-radius:6px;padding:12px 14px;cursor:pointer;color:var(--ink)}
+.lvl b{display:block;font:600 1.05rem "Bricolage Grotesque",sans-serif}
+.lvl span{font-size:.9rem;color:var(--muted)}
+.lvl[aria-pressed="true"]{background:var(--c);border-color:var(--c);color:#fff}
+.lvl[aria-pressed="true"] span{color:#ffffffd9}
+.lvl:nth-child(1){--c:var(--l1)}.lvl:nth-child(2){--c:var(--l2)}.lvl:nth-child(3){--c:var(--l3)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.card{background:var(--card);border:2px solid var(--ink);border-left:10px solid var(--lv);border-radius:6px;padding:22px 24px;box-shadow:6px 6px 0 var(--ink)}
+.card h2{font:600 1.1rem "Bricolage Grotesque",sans-serif;margin:0 0 10px;color:var(--lv)}
+#problem{font-size:1.35rem;line-height:1.4;margin:0;white-space:pre-wrap;min-height:2.8em}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.btn{font:600 .95rem "Source Sans 3",sans-serif;background:var(--card);color:var(--ink);border:2px solid var(--ink);border-radius:6px;padding:9px 14px;cursor:pointer}
+.btn.primary{background:var(--lv);border-color:var(--lv);color:#fff}
+.btn:disabled{opacity:.5;cursor:default}
+form{display:flex;gap:10px;margin-top:18px}
+input{flex:1;min-width:0;font:inherit;padding:9px 12px;border:2px solid var(--ink);border-radius:6px}
+.out{margin-top:18px;padding:14px 16px;border-radius:6px;background:var(--paper);border:2px dashed var(--lv);white-space:pre-wrap}
+.out[hidden]{display:none}
+.out small{display:block;color:var(--muted);margin-bottom:4px;font-weight:600}
+.out.ok{border-style:solid;background:#e7f6f1}
+.status{margin-top:22px;font-size:.9rem;color:var(--muted)}
+@media(max-width:560px){.levels{grid-template-columns:1fr}form{flex-direction:column}}
+@media(prefers-reduced-motion:no-preference){.out{animation:in .25s ease-out}@keyframes in{from{opacity:0}to{opacity:1}}}
+</style>
+</head>
+<body>
+<main id="app" data-level="1">
+  <h1>Quadratic Lab</h1>
+  <p class="sub">One skill, three levels of challenge. Choose where you are today, and the AI adjusts the problem, the hints and the explanations to match.</p>
+
+  <div class="levels" role="group" aria-label="Difficulty level">
+    <button class="lvl" data-l="1" aria-pressed="true"><b>Foundation</b><span>Guided steps and direct hints</span></button>
+    <button class="lvl" data-l="2" aria-pressed="false"><b>Standard</b><span>Grade-level problem solving</span></button>
+    <button class="lvl" data-l="3" aria-pressed="false"><b>Advanced</b><span>Real-world, multi-step modelling</span></button>
+  </div>
+
+  <section class="card" aria-live="polite">
+    <h2 id="lvlname">Foundation problem</h2>
+    <p id="problem">Loading…</p>
+    <div class="row">
+      <button class="btn" id="hint">Get a hint</button>
+      <button class="btn" id="explain">Show worked solution</button>
+      <button class="btn" id="next">New problem</button>
+    </div>
+    <form id="form">
+      <input id="ans" autocomplete="off" aria-label="Your answer" placeholder="Your answer, e.g. 2, 3">
+      <button class="btn primary" type="submit">Check answer</button>
+    </form>
+    <div class="out" id="out" hidden></div>
+  </section>
+  <p class="status" id="status"></p>
+</main>
+
+<script>
+// ---- Offline examples: used when the AI backend is unavailable ----
+const BANK = {
+  1: {text: "Solve x² - 5x + 6 = 0.", roots: ["2","3"],
+    hints: ["Look for two numbers that multiply to 6 and add to -5.", "Try -2 and -3: (-2) × (-3) = 6 and (-2) + (-3) = -5.", "So (x - 2)(x - 3) = 0. Set each bracket equal to zero."],
+    solution: "Step 1: Find two numbers that multiply to 6 and add to -5. They are -2 and -3.\nStep 2: Write the factors: (x - 2)(x - 3) = 0.\nStep 3: If a product is zero, one factor is zero. So x - 2 = 0 or x - 3 = 0.\nStep 4: x = 2 or x = 3."},
+  2: {text: "Solve 2x² - 7x + 3 = 0.", roots: ["1/2","3"],
+    hints: ["The leading coefficient is not 1. Try factoring by grouping, or use the quadratic formula.", "Find two numbers that multiply to 2 × 3 = 6 and add to -7.", "Split the middle term using -1 and -6, then factor by grouping."],
+    solution: "Split the middle term: 2x² - x - 6x + 3 = 0.\nGroup: x(2x - 1) - 3(2x - 1) = 0.\nFactor: (2x - 1)(x - 3) = 0.\nSo x = 1/2 or x = 3."},
+  3: {text: "A rectangular garden is 3 m longer than it is wide. Its area is 40 m². Find its dimensions.", roots: ["5","-8"],
+    hints: ["What should x represent? Write the length in terms of x.", "Area = width × length. What equation does that give you?", "You should reach x² + 3x - 40 = 0. Solve it, then ask which root makes sense for a width."],
+    solution: "Define: let x be the width in metres, so the length is x + 3.\nModel: x(x + 3) = 40, which gives x² + 3x - 40 = 0.\nSolve: (x + 8)(x - 5) = 0, so x = -8 or x = 5.\nInterpret: a width cannot be negative, so reject -8. The garden is 5 m by 8 m."}
+};
+const NAMES = {1: "Foundation", 2: "Standard", 3: "Advanced"};
+const $ = (id) => document.getElementById(id);
+let level = 1, problem = null, hintN = 0, offline = false, offlineIdx = {1:0,2:0,3:0};
+
+// ---- Answer checking (same logic as the server) ----
+const toNum = (r) => { const [p,q] = r.split("/"); return q ? +p / +q : +p; };
+function verdict(answer, roots) {
+  const cleaned = answer.replace(/x\s*\^?\s*[²2]/gi, "");
+  const got = (cleaned.match(/-?\s?\d+(?:\.\d+)?(?:\/\d+)?/g) || []).map(t => toNum(t.replace(/\s/g, "")));
+  const hit = roots.map(toNum).filter(w => got.some(g => Math.abs(g - w) < 1e-6));
+  return hit.length === roots.length ? "full" : hit.length ? "partial" : "wrong";
+}
+const CANNED = {full: "Correct. You found every solution.", partial: "Nearly there. You have part of the answer; check whether there is another solution.", wrong: "Not yet. Re-check your steps, or use a hint."};
+
+// ---- API with graceful fallback ----
+async function api(payload) {
+  if (offline) throw new Error("offline");
+  try {
+    const r = await fetch("/api/generate", {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({level, problem, ...payload})});
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch (e) { offline = true; setStatus(); throw e; }
+}
+function setStatus() {
+  $("status").textContent = offline ? "Offline mode: showing built-in example problems. Add an API key to turn the AI on." : "AI tutor connected. Every problem is generated fresh and checked for mathematical correctness.";
+}
+function show(text, label, cls = "") {
+  const o = $("out"); o.hidden = false; o.className = "out " + cls;
+  o.textContent = ""; const s = document.createElement("small"); s.textContent = label;
+  o.append(s, document.createTextNode(text));
+}
+function busy(on) { document.querySelectorAll(".btn").forEach(b => b.disabled = on); }
+
+// ---- Actions ----
+async function newProblem() {
+  hintN = 0; $("out").hidden = true; $("ans").value = "";
+  $("lvlname").textContent = NAMES[level] + " problem";
+  $("problem").textContent = "Writing a problem…"; busy(true);
+  try { problem = await api({mode: "problem"}); }
+  catch (e) { const i = offlineIdx[level]++ ; problem = BANK[level]; }
+  $("problem").textContent = problem.text; busy(false);
+}
+async function hint() {
+  if (hintN >= 3) return show("You have used all three hints. Try the worked solution.", "Hints");
+  hintN++; busy(true);
+  try { show((await api({mode: "hint", n: hintN})).text, `Hint ${hintN} of 3`); }
+  catch (e) { show(BANK[level].hints[hintN - 1] || "", `Hint ${hintN} of 3`); }
+  busy(false);
+}
+async function explain() {
+  busy(true);
+  try { show((await api({mode: "explain"})).text, "Worked solution"); }
+  catch (e) { show(BANK[level].solution, "Worked solution"); }
+  busy(false);
+}
+async function check(ev) {
+  ev.preventDefault(); const a = $("ans").value.trim(); if (!a) return $("ans").focus();
+  busy(true);
+  try { const r = await api({mode: "check", answer: a}); show(r.text, "Feedback", r.verdict === "full" ? "ok" : ""); }
+  catch (e) { const v = verdict(a, problem.roots); show(CANNED[v], "Feedback", v === "full" ? "ok" : ""); }
+  busy(false);
+}
+function setLevel(l) {
+  level = l; $("app").dataset.level = l;
+  document.querySelectorAll(".lvl").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.l === l)));
+  newProblem();
+}
+
+document.querySelectorAll(".lvl").forEach(b => b.addEventListener("click", () => setLevel(+b.dataset.l)));
+$("hint").onclick = hint; $("explain").onclick = explain; $("next").onclick = newProblem; $("form").onsubmit = check;
+setStatus(); newProblem();
+</script>
+</body>
+</html>
